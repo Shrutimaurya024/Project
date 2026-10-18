@@ -1,0 +1,225 @@
+#Retail Sales Analysis Using SQL
+
+
+CREATE DATABASE retail_sales;
+USE retail_sales;
+
+CREATE TABLE customers (
+    customer_id INT PRIMARY KEY,
+    customer_name VARCHAR(100),
+    city VARCHAR(50),
+    state VARCHAR(50)
+);
+
+CREATE TABLE products (
+    product_id INT PRIMARY KEY,
+    product_name VARCHAR(100),
+    category VARCHAR(50),
+    price DECIMAL(10,2)
+);
+
+CREATE TABLE orders (
+    order_id INT PRIMARY KEY,
+    customer_id INT,
+    order_date DATE,
+    FOREIGN KEY (customer_id)
+        REFERENCES customers(customer_id)
+);
+
+CREATE TABLE order_items (
+    order_item_id INT PRIMARY KEY,
+    order_id INT,
+    product_id INT,
+    quantity INT,
+    unit_price DECIMAL(10,2),
+    FOREIGN KEY (order_id)
+        REFERENCES orders(order_id),
+    FOREIGN KEY (product_id)
+        REFERENCES products(product_id)
+);
+
+
+INSERT INTO customers VALUES
+(1, 'Amit Sharma', 'Mumbai', 'Maharashtra'),
+(2, 'Priya Verma', 'Thane', 'Maharashtra'),
+(3, 'Rahul Patil', 'Pune', 'Maharashtra'),
+(4, 'Neha Singh', 'Delhi', 'Delhi'),
+(5, 'Karan Shah', 'Ahmedabad', 'Gujarat'),
+(6, 'Sneha Joshi', 'Nashik', 'Maharashtra');
+
+INSERT INTO products VALUES
+(101, 'Laptop', 'Electronics', 55000),
+(102, 'Mobile', 'Electronics', 20000),
+(103, 'Headphones', 'Accessories', 1500),
+(104, 'Office Chair', 'Furniture', 5000),
+(105, 'Keyboard', 'Accessories', 1000),
+(106, 'Desk', 'Furniture', 8000);
+
+INSERT INTO orders VALUES
+(1001, 1, '2026-01-05'),
+(1002, 2, '2026-01-10'),
+(1003, 3, '2026-02-02'),
+(1004, 1, '2026-02-15'),
+(1005, 4, '2026-03-03'),
+(1006, 5, '2026-03-12'),
+(1007, 2, '2026-03-20'),
+(1008, 6, '2026-04-01'),
+(1009, 3, '2026-04-11'),
+(1010, 5, '2026-04-22');
+
+INSERT INTO order_items VALUES
+(1, 1001, 101, 1, 54000),
+(2, 1001, 103, 2, 1400),
+(3, 1002, 102, 1, 19500),
+(4, 1002, 105, 2, 900),
+(5, 1003, 104, 2, 4800),
+(6, 1003, 105, 1, 950),
+(7, 1004, 102, 2, 19000),
+(8, 1004, 103, 1, 1400),
+(9, 1005, 101, 1, 53000),
+(10, 1005, 105, 3, 900),
+(11, 1006, 106, 1, 7800),
+(12, 1006, 104, 1, 4700),
+(13, 1007, 103, 3, 1350),
+(14, 1007, 105, 2, 850),
+(15, 1008, 102, 1, 20000),
+(16, 1008, 106, 2, 7600),
+(17, 1009, 101, 1, 55000),
+(18, 1009, 103, 2, 1450),
+(19, 1010, 104, 1, 5000),
+(20, 1010, 105, 4, 950);
+
+SELECT * FROM customers;
+SELECT * FROM products;
+SELECT * FROM orders;
+SELECT * FROM order_items;
+
+SELECT
+    ROUND(SUM(quantity * unit_price), 2) AS total_revenue
+FROM order_items;
+
+SELECT
+    COUNT(DISTINCT o.order_id) AS total_orders,
+    COUNT(DISTINCT o.customer_id) AS unique_customers
+FROM orders o;
+
+SELECT
+    DATE_FORMAT(o.order_date, '%Y-%m') AS sales_month,
+    ROUND(SUM(oi.quantity * oi.unit_price), 2) AS revenue
+FROM orders o
+JOIN order_items oi
+    ON o.order_id = oi.order_id
+GROUP BY DATE_FORMAT(o.order_date, '%Y-%m')
+ORDER BY sales_month;
+
+SELECT
+    p.product_name,
+    SUM(oi.quantity) AS units_sold,
+    ROUND(
+        SUM(oi.quantity * oi.unit_price), 2
+    ) AS revenue
+FROM products p
+JOIN order_items oi
+    ON p.product_id = oi.product_id
+GROUP BY p.product_id, p.product_name
+ORDER BY revenue DESC;
+
+SELECT
+    p.category,
+    ROUND(
+        SUM(oi.quantity * oi.unit_price), 2
+    ) AS category_revenue
+FROM products p
+JOIN order_items oi
+    ON p.product_id = oi.product_id
+GROUP BY p.category
+ORDER BY category_revenue DESC;
+
+SELECT
+    c.customer_name,
+    ROUND(SUM(oi.quantity * oi.unit_price), 2) AS total_spending
+FROM customers c
+JOIN orders o
+    ON c.customer_id = o.customer_id
+JOIN order_items oi
+    ON o.order_id = oi.order_id
+GROUP BY c.customer_id, c.customer_name
+ORDER BY total_spending DESC
+LIMIT 3;
+
+SELECT
+    c.city, COUNT(DISTINCT o.order_id) AS total_orders,
+    ROUND(SUM(oi.quantity * oi.unit_price), 2) AS revenue
+FROM customers c
+JOIN orders o
+    ON c.customer_id = o.customer_id
+JOIN order_items oi
+    ON o.order_id = oi.order_id
+GROUP BY c.city
+ORDER BY revenue DESC;
+
+SELECT
+    c.customer_id,
+    c.customer_name
+FROM customers c
+LEFT JOIN orders o
+    ON c.customer_id = o.customer_id
+WHERE o.order_id IS NULL;
+
+WITH product_sales AS (
+    SELECT
+        p.product_id,
+        p.product_name,
+        SUM(oi.quantity * oi.unit_price) AS revenue
+    FROM products p
+    JOIN order_items oi
+        ON p.product_id = oi.product_id
+    GROUP BY p.product_id, p.product_name
+)
+SELECT
+    product_name,
+    revenue,
+    DENSE_RANK() OVER (
+        ORDER BY revenue DESC
+    ) AS sales_rank
+FROM product_sales
+ORDER BY sales_rank;
+
+WITH category_sales AS (
+    SELECT
+        p.category,
+        SUM(oi.quantity * oi.unit_price) AS revenue
+    FROM products p
+    JOIN order_items oi
+        ON p.product_id = oi.product_id
+    GROUP BY p.category
+)
+SELECT
+    category,
+    ROUND(revenue, 2) AS revenue,
+    ROUND(
+        revenue * 100.0 /
+        SUM(revenue) OVER (), 2
+    ) AS revenue_percentage
+FROM category_sales
+ORDER BY revenue DESC;
+
+WITH order_totals AS (
+    SELECT
+        o.order_id,
+        SUM(oi.quantity * oi.unit_price) AS order_value
+    FROM orders o
+    JOIN order_items oi
+        ON o.order_id = oi.order_id
+    GROUP BY o.order_id
+)
+SELECT
+    ROUND(AVG(order_value), 2) AS average_order_value
+FROM order_totals;
+
+SELECT *
+FROM order_items
+WHERE quantity <= 0
+   OR unit_price < 0
+   OR quantity IS NULL
+   OR unit_price IS NULL;
